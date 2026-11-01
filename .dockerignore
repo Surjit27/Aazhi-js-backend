@@ -1,0 +1,17 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Secrets & local env
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# Docs / IDE
+README.md
+*.md
+.vscode
+.idea

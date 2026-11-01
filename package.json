@@ -1,0 +1,32 @@
+{
+  "name": "aazhi-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Preflight AI API — Express, PostgreSQL, MongoDB",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node src/server.js",
+    "dev:watch": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "db:migrate": "node src/db/migrate.js",
+    "docker:db": "docker compose up -d postgres mongo",
+    "docker:up": "docker compose up --build",
+    "docker:up:detached": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.12.0",
+    "morgan": "^1.10.0",
+    "pg": "^8.13.1"
+  }
+}

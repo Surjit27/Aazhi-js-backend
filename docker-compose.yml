@@ -1,0 +1,62 @@
+name: aazhi-backend
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: aazhi
+      POSTGRES_PASSWORD: aazhi
+      POSTGRES_DB: aazhi
+    volumes:
+      - aazhi_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aazhi -d aazhi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - aazhi_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      CORS_ORIGIN: http://localhost:5173,http://admin.localhost:5173
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: aazhi
+      POSTGRES_PASSWORD: aazhi
+      POSTGRES_DB: aazhi
+      MONGODB_URI: mongodb://mongo:27017/aazhi
+      JWT_SECRET: dev-docker-jwt-secret-change-in-prod
+      ADMIN_EMAIL: admin@aazhi.local
+      ADMIN_PASSWORD: Admin123!
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
+volumes:
+  aazhi_pg_data:
+  aazhi_mongo_data:

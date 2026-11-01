@@ -1,0 +1,33 @@
+import { createApp } from './app.js'
+import { env } from './config/env.js'
+import { closeDatabases, connectDatabases } from './db/index.js'
+import { runMigrations } from './db/migrate.js'
+import { seedAdminUser } from './db/seed.js'
+
+async function main() {
+  await connectDatabases()
+  await runMigrations()
+  await seedAdminUser()
+  console.log('[db] PostgreSQL and MongoDB connected')
+
+  const app = createApp()
+  const server = app.listen(env.port, () => {
+    console.log(`[server] listening on http://127.0.0.1:${env.port}`)
+  })
+
+  const shutdown = async (signal) => {
+    console.log(`[server] ${signal} — shutting down`)
+    server.close(async () => {
+      await closeDatabases()
+      process.exit(0)
+    })
+  }
+
+  process.on('SIGINT', () => shutdown('SIGINT'))
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
+}
+
+main().catch((err) => {
+  console.error('[server] failed to start', err)
+  process.exit(1)
+})
