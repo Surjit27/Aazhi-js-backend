@@ -1,0 +1,74 @@
+// One shared table per kind of data. A new client does not get its own physical
+// tables. Add a model here, give it clientId -> User, then run:
+//   npx prisma migrate dev --name add_client_orders
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Portal account. Client-owned models should reference this id.
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         String   @db.VarChar(40)
+  displayName  String   @default("") @map("display_name") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([role], map: "idx_users_role")
+  @@map("users")
+}
+
+model Role {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key       String   @unique @db.VarChar(40)
+  label     String   @db.VarChar(80)
+  portal    String   @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("roles")
+}
+
+model EmailSettings {
+  id             Boolean  @id @default(true)
+  enabled        Boolean  @default(false)
+  host           String   @default("") @db.VarChar(255)
+  port           Int      @default(587)
+  secure         Boolean  @default(false)
+  username       String   @default("") @db.VarChar(255)
+  passwordCipher String   @default("") @map("password_cipher")
+  apiKeyCipher   String   @default("") @map("api_key_cipher")
+  fromEmail      String   @default("") @map("from_email") @db.VarChar(255)
+  fromName       String   @default("") @map("from_name") @db.VarChar(255)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("email_settings")
+}
+
+model JobTrigger {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String    @db.VarChar(120)
+  triggerType String    @map("trigger_type") @db.VarChar(20)
+  recurrence  String    @default("daily") @db.VarChar(20)
+  startAt     DateTime? @map("start_at") @db.Timestamptz(6)
+  eventName   String    @default("") @map("event_name") @db.VarChar(120)
+  dependsOn   String?   @map("depends_on") @db.Uuid
+  target      String    @db.VarChar(200)
+  payload     Json      @default("{}")
+  enabled     Boolean   @default(true)
+  lastStatus  String    @default("never") @map("last_status") @db.VarChar(20)
+  lastRunAt   DateTime? @map("last_run_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  parent     JobTrigger?  @relation("JobDependency", fields: [dependsOn], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  dependents JobTrigger[] @relation("JobDependency")
+
+  @@map("job_triggers")
+}
