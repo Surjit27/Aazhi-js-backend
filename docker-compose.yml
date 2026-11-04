@@ -51,6 +51,7 @@ services:
       JWT_SECRET: dev-docker-jwt-secret-change-in-prod
       ADMIN_EMAIL: admin@aazhi.local
       ADMIN_PASSWORD: Admin123!
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

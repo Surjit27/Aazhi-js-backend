@@ -1,12 +1,14 @@
 import { Router } from 'express'
 import { healthRouter } from './health.routes.js'
 import { authRouter } from './auth.routes.js'
+import { emailSettingsRouter } from './emailSettings.routes.js'
 import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 
 export const apiRouter = Router()
 
 apiRouter.use(healthRouter)
 apiRouter.use('/auth', authRouter)
+apiRouter.use('/settings', emailSettingsRouter)
 
 apiRouter.get(
   '/orders',

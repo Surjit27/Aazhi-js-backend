@@ -33,8 +33,27 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(40);
 `
 
+const EMAIL_SETTINGS_SQL = `
+CREATE TABLE IF NOT EXISTS email_settings (
+  id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  api_key_cipher TEXT NOT NULL DEFAULT '',
+  from_email VARCHAR(255) NOT NULL DEFAULT '',
+  from_name VARCHAR(255) NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO email_settings (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS api_key_cipher TEXT NOT NULL DEFAULT '';
+ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS from_email VARCHAR(255) NOT NULL DEFAULT '';
+ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS from_name VARCHAR(255) NOT NULL DEFAULT '';
+ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT FALSE;
+`
+
 export async function runMigrations() {
   const pool = getPostgresPool()
   await pool.query(USERS_SQL)
   await pool.query(ROLES_SQL)
+  await pool.query(EMAIL_SETTINGS_SQL)
 }
