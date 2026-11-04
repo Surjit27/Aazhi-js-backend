@@ -3,7 +3,9 @@ import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal
 import { rateLimit } from '../middleware/rateLimit.js'
 import {
   exchangeImpersonationCode,
+  createRoleCatalog,
   listAccounts,
+  listRoleCatalog,
   login,
   registerUser,
   revokeAccessToken,
@@ -79,9 +81,29 @@ authRouter.post('/impersonate/exchange', exchangeLimiter, async (req, res, next)
   }
 })
 
+authRouter.get('/roles', authenticate, requireRoleMatchesPortal, requireRole('admin'), requireAdminPortal, async (req, res, next) => {
+  try {
+    const roles = await listRoleCatalog(req.auth.role)
+    res.json({ roles })
+  } catch (err) {
+    next(err)
+  }
+})
+
+authRouter.post('/roles', authenticate, requireRoleMatchesPortal, requireRole('admin'), requireAdminPortal, async (req, res, next) => {
+  try {
+    const { key, label, portal } = req.body ?? {}
+    const role = await createRoleCatalog({ key, label, portal }, req.auth.role)
+    res.status(201).json({ role })
+  } catch (err) {
+    next(err)
+  }
+})
+
 authRouter.get('/users', authenticate, requireRoleMatchesPortal, requireRole('admin'), requireAdminPortal, async (req, res, next) => {
   try {
-    const role = req.query.role === 'client' || req.query.role === 'admin' ? req.query.role : undefined
+    const requested = typeof req.query.role === 'string' ? req.query.role : ''
+    const role = /^[a-z][a-z0-9_]{1,39}$/.test(requested) ? requested : undefined
     const users = await listAccounts(req.auth.role, { role })
     res.json({ users })
   } catch (err) {
@@ -98,8 +120,7 @@ authRouter.post('/users', authenticate, requireRoleMatchesPortal, requireRole('a
     if (password.length < 8) {
       return res.status(400).json({ error: 'password must be at least 8 characters' })
     }
-    const userRole = role === 'admin' ? 'admin' : 'client'
-    const user = await registerUser({ email, password, displayName, role: userRole }, req.auth.role)
+    const user = await registerUser({ email, password, displayName, role: String(role) }, req.auth.role)
     res.status(201).json({ user })
   } catch (err) {
     next(err)

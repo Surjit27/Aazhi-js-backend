@@ -2,8 +2,11 @@ import { getPostgresPool } from '../db/postgres.js'
 
 export async function findUserByEmail(email) {
   const { rows } = await getPostgresPool().query(
-    `SELECT id, email, password_hash, role, display_name, created_at
-     FROM users WHERE email = $1`,
+    `SELECT u.id, u.email, u.password_hash, u.role, u.display_name, u.created_at,
+            COALESCE(r.portal, CASE WHEN u.role = 'admin' THEN 'admin' ELSE 'client' END) AS portal
+     FROM users u
+     LEFT JOIN roles r ON r.key = u.role
+     WHERE u.email = $1`,
     [email.toLowerCase()],
   )
   return rows[0] ?? null
@@ -11,8 +14,11 @@ export async function findUserByEmail(email) {
 
 export async function findUserById(id) {
   const { rows } = await getPostgresPool().query(
-    `SELECT id, email, role, display_name, created_at
-     FROM users WHERE id = $1`,
+    `SELECT u.id, u.email, u.role, u.display_name, u.created_at,
+            COALESCE(r.portal, CASE WHEN u.role = 'admin' THEN 'admin' ELSE 'client' END) AS portal
+     FROM users u
+     LEFT JOIN roles r ON r.key = u.role
+     WHERE u.id = $1`,
     [id],
   )
   return rows[0] ?? null
@@ -22,7 +28,8 @@ export async function createUser({ email, passwordHash, role, displayName }) {
   const { rows } = await getPostgresPool().query(
     `INSERT INTO users (email, password_hash, role, display_name)
      VALUES ($1, $2, $3, $4)
-     RETURNING id, email, role, display_name, created_at`,
+     RETURNING id, email, role, display_name, created_at,
+       (SELECT portal FROM roles WHERE key = $3) AS portal`,
     [email.toLowerCase(), passwordHash, role, displayName],
   )
   return rows[0]
@@ -31,15 +38,19 @@ export async function createUser({ email, passwordHash, role, displayName }) {
 export async function listUsers({ role } = {}) {
   if (role) {
     const { rows } = await getPostgresPool().query(
-      `SELECT id, email, role, display_name, created_at
-       FROM users WHERE role = $1 ORDER BY created_at DESC`,
+      `SELECT u.id, u.email, u.role, u.display_name, u.created_at, r.portal
+       FROM users u
+       LEFT JOIN roles r ON r.key = u.role
+       WHERE u.role = $1 ORDER BY u.created_at DESC`,
       [role],
     )
     return rows
   }
   const { rows } = await getPostgresPool().query(
-    `SELECT id, email, role, display_name, created_at
-     FROM users ORDER BY created_at DESC`,
+    `SELECT u.id, u.email, u.role, u.display_name, u.created_at, r.portal
+     FROM users u
+     LEFT JOIN roles r ON r.key = u.role
+     ORDER BY u.created_at DESC`,
   )
   return rows
 }
@@ -50,6 +61,7 @@ export function toPublicUser(row) {
     id: row.id,
     email: row.email,
     role: row.role,
+    portal: row.portal || (row.role === 'admin' ? 'admin' : 'client'),
     displayName: row.display_name,
     createdAt: row.created_at,
   }

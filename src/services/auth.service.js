@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
+import { createRole, findRoleByKey, listRoles, toPublicRole } from '../repositories/roles.repository.js'
 import { createUser, findUserByEmail, findUserById, listUsers, toPublicUser } from '../repositories/users.repository.js'
 import { consumeImpersonationCode, isJtiRevoked, issueImpersonationCode, revokeJti } from './tokenStore.js'
 
@@ -11,6 +12,7 @@ export function signAccessToken(user, { expiresIn, impersonatedBy } = {}) {
   const payload = {
     sub: user.id,
     role: user.role,
+    portal: user.portal || (user.role === 'admin' ? 'admin' : 'client'),
     email: user.email,
     jti: randomUUID(),
   }
@@ -60,13 +62,12 @@ export async function login(email, password, appSurface) {
     throw err
   }
   const publicUser = toPublicUser(user)
-  if (appSurface === 'admin' && publicUser.role !== 'admin') {
-    const err = new Error('Client accounts must sign in at localhost, not admin.localhost')
-    err.status = 403
-    throw err
-  }
-  if (appSurface === 'client' && publicUser.role !== 'client') {
-    const err = new Error('Admin accounts must sign in at admin.localhost')
+  if (publicUser.portal !== appSurface) {
+    const err = new Error(
+      publicUser.portal === 'admin'
+        ? 'This account must sign in at admin.localhost'
+        : 'This account must sign in at localhost, not admin.localhost',
+    )
     err.status = 403
     throw err
   }
@@ -90,8 +91,9 @@ export async function registerUser({ email, password, displayName, role }, actor
     err.status = 403
     throw err
   }
-  if (role !== 'admin' && role !== 'client') {
-    const err = new Error('role must be admin or client')
+  const roleRow = await findRoleByKey(role)
+  if (!roleRow) {
+    const err = new Error('Unknown role')
     err.status = 400
     throw err
   }
@@ -114,6 +116,51 @@ export async function registerUser({ email, password, displayName, role }, actor
 /** @deprecated use registerUser */
 export async function registerClient(payload, actorRole) {
   return registerUser({ ...payload, role: 'client' }, actorRole)
+}
+
+const ROLE_KEY_RE = /^[a-z][a-z0-9_]{1,39}$/
+
+export async function listRoleCatalog(actorRole) {
+  if (actorRole !== 'admin') {
+    const err = new Error('Forbidden')
+    err.status = 403
+    throw err
+  }
+  const rows = await listRoles()
+  return rows.map(toPublicRole)
+}
+
+export async function createRoleCatalog({ key, label, portal }, actorRole) {
+  if (actorRole !== 'admin') {
+    const err = new Error('Only admins can create roles')
+    err.status = 403
+    throw err
+  }
+  const roleKey = String(key ?? '').trim().toLowerCase()
+  const roleLabel = String(label ?? '').trim()
+  if (!ROLE_KEY_RE.test(roleKey)) {
+    const err = new Error('Role key must be 2–40 lowercase letters, numbers, or underscores')
+    err.status = 400
+    throw err
+  }
+  if (!roleLabel || roleLabel.length > 80) {
+    const err = new Error('Role label is required')
+    err.status = 400
+    throw err
+  }
+  if (portal !== 'admin' && portal !== 'client') {
+    const err = new Error('portal must be admin or client')
+    err.status = 400
+    throw err
+  }
+  const existing = await findRoleByKey(roleKey)
+  if (existing) {
+    const err = new Error('Role already exists')
+    err.status = 409
+    throw err
+  }
+  const row = await createRole({ key: roleKey, label: roleLabel, portal })
+  return toPublicRole(row)
 }
 
 export async function startClientImpersonation(adminUserId, targetUserId) {
