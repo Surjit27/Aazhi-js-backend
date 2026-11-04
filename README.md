@@ -60,7 +60,8 @@ node -v             # must show v20.x
 cp .env.example .env
 npm install
 npm run docker:db   # Postgres :5433 + Mongo :27017 (avoids local Postgres on 5432)
-npm run dev         # http://localhost:4000
+docker compose up -d redis   # BullMQ on :6379
+npm run dev         # http://localhost:4000  (starts the BullMQ worker when REDIS_URL is set)
 ```
 
 Hot reload (Node 20+ only): `npm run dev:watch`
@@ -86,6 +87,16 @@ Login rejects wrong role for the portal. Authenticated routes also require `req.
 | POST | `/api/auth/users` | Admin portal + admin role — create `admin` or `client` |
 
 Default admin (seeded on first start): see `.env` `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+
+## Job triggers (BullMQ)
+
+Time, event, and dependency triggers are stored in PostgreSQL and run by a BullMQ worker in the API process. Redis must be up or the API still starts and reports the runner as off.
+
+```bash
+docker compose up -d redis
+```
+
+`REDIS_URL` defaults to `redis://127.0.0.1:6379` in `.env.example`. Run now waits until the worker finishes and records `last_status`. The worker logs the target; it does not call that URL.
 
 Protected examples: `/api/admin/summary` (admin), `/api/client/summary` (client).
 
