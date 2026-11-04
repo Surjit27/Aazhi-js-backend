@@ -33,8 +33,28 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(40);
 `
 
+const JOB_TRIGGERS_SQL = `
+CREATE TABLE IF NOT EXISTS job_triggers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(120) NOT NULL,
+  trigger_type VARCHAR(20) NOT NULL CHECK (trigger_type IN ('time', 'event', 'dependency')),
+  recurrence VARCHAR(20) NOT NULL DEFAULT 'daily' CHECK (recurrence IN ('once', 'hourly', 'daily', 'weekly')),
+  start_at TIMESTAMPTZ,
+  event_name VARCHAR(120) NOT NULL DEFAULT '',
+  depends_on UUID REFERENCES job_triggers (id) ON DELETE SET NULL,
+  target VARCHAR(200) NOT NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  last_status VARCHAR(20) NOT NULL DEFAULT 'never' CHECK (last_status IN ('never', 'success', 'failed')),
+  last_run_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`
+
 export async function runMigrations() {
   const pool = getPostgresPool()
   await pool.query(USERS_SQL)
   await pool.query(ROLES_SQL)
+  await pool.query(JOB_TRIGGERS_SQL)
 }

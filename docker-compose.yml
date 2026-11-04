@@ -31,6 +31,17 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -48,6 +59,7 @@ services:
       POSTGRES_PASSWORD: aazhi
       POSTGRES_DB: aazhi
       MONGODB_URI: mongodb://mongo:27017/aazhi
+      REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-docker-jwt-secret-change-in-prod
       ADMIN_EMAIL: admin@aazhi.local
       ADMIN_PASSWORD: Admin123!
@@ -55,6 +67,8 @@ services:
       postgres:
         condition: service_healthy
       mongo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
 volumes:
