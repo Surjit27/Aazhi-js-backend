@@ -88,6 +88,16 @@ Login rejects wrong role for the portal. Authenticated routes also require `req.
 
 Default admin (seeded on first start): see `.env` `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 
+## Email (SendGrid)
+
+Admin Settings stores the from address and an optional API key. The key is encrypted in PostgreSQL. For local use, create a key in SendGrid and put it in `.env`:
+
+```bash
+SENDGRID_API_KEY=SG.your-key
+```
+
+Restart the API after changing `.env`. The Settings test sends one message through SendGrid. A saved key in Settings overrides `SENDGRID_API_KEY`.
+
 ## Job triggers (BullMQ)
 
 Time, event, and dependency triggers are stored in PostgreSQL and run by a BullMQ worker in the API process. Redis must be up or the API still starts and reports the runner as off.

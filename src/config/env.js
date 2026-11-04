@@ -40,4 +40,5 @@ export const env = {
     adminPassword: process.env.ADMIN_PASSWORD ?? 'Admin123!',
     adminName: process.env.ADMIN_NAME ?? 'Platform Admin',
   },
+  sendgridApiKey: process.env.SENDGRID_API_KEY ?? '',
 }

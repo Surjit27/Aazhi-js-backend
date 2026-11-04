@@ -19,6 +19,7 @@
     "docker:logs": "docker compose logs -f"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.81.5",
     "cors": "^2.8.5",
