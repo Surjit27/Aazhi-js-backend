@@ -15,6 +15,7 @@ export async function authenticate(req, res, next) {
       jti: payload.jti,
       exp: payload.exp,
       impersonatedBy: payload.impersonatedBy ?? null,
+      portal: payload.portal || (payload.role === 'admin' ? 'admin' : 'client'),
     }
     req.user = await getProfile(payload.sub)
     if (req.user.role !== payload.role) {
@@ -55,7 +56,8 @@ export function requireRoleMatchesPortal(req, res, next) {
   if (req.auth.impersonatedBy && surface !== 'client') {
     return res.status(403).json({ error: 'Impersonation sessions are client-portal only' })
   }
-  if (req.auth.role !== surface) {
+  const portal = req.auth.portal || (req.auth.role === 'admin' ? 'admin' : 'client')
+  if (portal !== surface) {
     return res.status(403).json({ error: 'Role does not match app portal' })
   }
   next()
