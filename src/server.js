@@ -3,12 +3,14 @@ import { env } from './config/env.js'
 import { closeDatabases, connectDatabases } from './db/index.js'
 import { runMigrations } from './db/migrate.js'
 import { seedAdminUser } from './db/seed.js'
+import { startJobRunner, stopJobRunner } from './jobs/runner.js'
 
 async function main() {
   await connectDatabases()
   await runMigrations()
   await seedAdminUser()
   console.log('[db] PostgreSQL and MongoDB connected')
+  await startJobRunner(env.redisUrl)
 
   const app = createApp()
   const server = app.listen(env.port, () => {
@@ -18,6 +20,7 @@ async function main() {
   const shutdown = async (signal) => {
     console.log(`[server] ${signal} — shutting down`)
     server.close(async () => {
+      await stopJobRunner()
       await closeDatabases()
       process.exit(0)
     })

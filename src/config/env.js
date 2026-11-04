@@ -32,6 +32,7 @@ export const env = {
   mongo: {
     uri: required('MONGODB_URI', process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/aazhi'),
   },
+  redisUrl: process.env.REDIS_URL ?? '',
   auth: {
     jwtSecret: required('JWT_SECRET', process.env.JWT_SECRET ?? 'dev-only-change-in-production'),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
