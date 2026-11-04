@@ -2,10 +2,12 @@ import { createApp } from './app.js'
 import { env } from './config/env.js'
 import { closeDatabases, connectDatabases } from './db/index.js'
 import { runMigrations } from './db/migrate.js'
+import { applyPrismaMigrations } from './db/prisma.js'
 import { seedAdminUser } from './db/seed.js'
 import { startJobRunner, stopJobRunner } from './jobs/runner.js'
 
 async function main() {
+  await applyPrismaMigrations()
   await connectDatabases()
   await runMigrations()
   await seedAdminUser()

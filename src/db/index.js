@@ -1,8 +1,9 @@
 import { closeMongo, connectMongo, mongoHealth } from './mongo.js'
 import { closePostgres, connectPostgres, postgresHealth } from './postgres.js'
+import { closePrisma, connectPrisma } from './prisma.js'
 
 export async function connectDatabases() {
-  await Promise.all([connectPostgres(), connectMongo()])
+  await Promise.all([connectPostgres(), connectPrisma(), connectMongo()])
 }
 
 export async function databasesHealth() {
@@ -11,5 +12,5 @@ export async function databasesHealth() {
 }
 
 export async function closeDatabases() {
-  await Promise.all([closePostgres(), closeMongo()])
+  await Promise.all([closePrisma(), closePostgres(), closeMongo()])
 }
