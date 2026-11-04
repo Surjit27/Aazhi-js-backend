@@ -69,12 +69,21 @@ Hot reload (Node 20+ only): `npm run dev:watch`
 
 User accounts live in **PostgreSQL** (`users` table: `admin` | `client` roles). **MongoDB** stays for app/document data — not for login.
 
+**Two portals (same idea as Ad-portal, role-only):**
+
+| Portal | Frontend host | `X-App-Surface` | Who can log in |
+|--------|---------------|-----------------|----------------|
+| Admin | `admin.localhost` | `admin` | `admin` users only |
+| Client | `localhost` | `client` | `client` users only |
+
+Login rejects wrong role for the portal. Authenticated routes also require `req.auth.role` to match `X-App-Surface`. Admin user APIs require admin portal + admin role.
+
 | Method | Path | Access |
 |--------|------|--------|
-| POST | `/api/auth/login` | Public `{ email, password }` → `{ token, user }` |
-| GET | `/api/auth/me` | Bearer token |
-| GET | `/api/auth/users` | Admin — list users |
-| POST | `/api/auth/users` | Admin — create **client** `{ email, password, displayName? }` |
+| POST | `/api/auth/login` | Public `{ email, password }` + portal header → `{ token, user }` |
+| GET | `/api/auth/me` | Bearer + matching portal |
+| GET | `/api/auth/users` | Admin portal + admin role |
+| POST | `/api/auth/users` | Admin portal + admin role — create `admin` or `client` |
 
 Default admin (seeded on first start): see `.env` `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 

@@ -1,21 +1,28 @@
 import { Router } from 'express'
 import { healthRouter } from './health.routes.js'
 import { authRouter } from './auth.routes.js'
-import { authenticate, requireRole } from '../middleware/auth.middleware.js'
+import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 
 export const apiRouter = Router()
 
 apiRouter.use(healthRouter)
 apiRouter.use('/auth', authRouter)
 
-apiRouter.get('/orders', authenticate, (_req, res) => {
-  res.json({ data: [], message: 'Orders API stub — implement in routes/orders.routes.js' })
-})
+apiRouter.get(
+  '/orders',
+  authenticate,
+  requireRoleMatchesPortal,
+  requireRole('admin'),
+  requireAdminPortal,
+  (_req, res) => {
+    res.json({ data: [], message: 'Orders service is restricted to the admin API' })
+  },
+)
 
-apiRouter.get('/admin/summary', authenticate, requireRole('admin'), (_req, res) => {
+apiRouter.get('/admin/summary', authenticate, requireRoleMatchesPortal, requireRole('admin'), (_req, res) => {
   res.json({ area: 'admin', message: 'Admin-only API surface' })
 })
 
-apiRouter.get('/client/summary', authenticate, requireRole('client'), (_req, res) => {
+apiRouter.get('/client/summary', authenticate, requireRoleMatchesPortal, requireRole('client'), (_req, res) => {
   res.json({ area: 'client', message: 'Client portal API surface' })
 })

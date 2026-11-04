@@ -1,0 +1,12 @@
+import { spawn } from 'node:child_process'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const child = spawn('npm', ['run', 'dev'], {
+  cwd: dirname(fileURLToPath(import.meta.url)),
+  stdio: 'inherit',
+})
+
+child.on('exit', (code) => {
+  process.exit(code ?? 1)
+})

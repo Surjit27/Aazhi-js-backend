@@ -1,23 +1,52 @@
+import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { createUser, findUserByEmail, findUserById, listUsers, toPublicUser } from '../repositories/users.repository.js'
+import { consumeImpersonationCode, isJtiRevoked, issueImpersonationCode, revokeJti } from './tokenStore.js'
 
-export function signAccessToken(user) {
-  return jwt.sign(
-    { sub: user.id, role: user.role, email: user.email },
-    env.auth.jwtSecret,
-    { expiresIn: env.auth.jwtExpiresIn },
-  )
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function signAccessToken(user, { expiresIn, impersonatedBy } = {}) {
+  const payload = {
+    sub: user.id,
+    role: user.role,
+    email: user.email,
+    jti: randomUUID(),
+  }
+  if (impersonatedBy) payload.impersonatedBy = impersonatedBy
+  return jwt.sign(payload, env.auth.jwtSecret, {
+    expiresIn: expiresIn ?? env.auth.jwtExpiresIn,
+  })
 }
 
 export function verifyAccessToken(token) {
-  return jwt.verify(token, env.auth.jwtSecret)
+  const payload = jwt.verify(token, env.auth.jwtSecret)
+  if (isJtiRevoked(payload.jti)) {
+    const err = new Error('Token revoked')
+    err.status = 401
+    throw err
+  }
+  if (payload.impersonatedBy && payload.role !== 'client') {
+    const err = new Error('Invalid impersonation token')
+    err.status = 401
+    throw err
+  }
+  return payload
+}
+
+export function revokeAccessToken(payload) {
+  revokeJti(payload?.jti, payload?.exp)
 }
 
 export async function login(email, password, appSurface) {
   const normalizedEmail = String(email).trim().toLowerCase()
   const normalizedPassword = String(password)
+  if (!EMAIL_RE.test(normalizedEmail) || normalizedPassword.length < 1 || normalizedPassword.length > 200) {
+    const err = new Error('Invalid email or password')
+    err.status = 401
+    throw err
+  }
   const user = await findUserByEmail(normalizedEmail)
   if (!user) {
     const err = new Error('Invalid email or password')
@@ -85,6 +114,41 @@ export async function registerUser({ email, password, displayName, role }, actor
 /** @deprecated use registerUser */
 export async function registerClient(payload, actorRole) {
   return registerUser({ ...payload, role: 'client' }, actorRole)
+}
+
+export async function startClientImpersonation(adminUserId, targetUserId) {
+  const target = await findUserById(targetUserId)
+  if (!target || target.role !== 'client') {
+    const err = new Error('Only client accounts can be opened this way')
+    err.status = 400
+    throw err
+  }
+  const code = issueImpersonationCode({ userId: target.id, adminId: adminUserId })
+  return { code, expiresInSeconds: 60 }
+}
+
+export async function exchangeImpersonationCode(code) {
+  const row = consumeImpersonationCode(String(code ?? ''))
+  if (!row) {
+    const err = new Error('Impersonation link expired or already used')
+    err.status = 401
+    throw err
+  }
+  const target = await findUserById(row.userId)
+  if (!target || target.role !== 'client') {
+    const err = new Error('Client account is no longer available')
+    err.status = 403
+    throw err
+  }
+  const publicUser = toPublicUser(target)
+  const token = signAccessToken(publicUser, {
+    expiresIn: '2h',
+    impersonatedBy: row.adminId,
+  })
+  return {
+    token,
+    user: { ...publicUser, impersonatedBy: row.adminId, impersonation: true },
+  }
 }
 
 export async function listAccounts(actorRole, { role } = {}) {
