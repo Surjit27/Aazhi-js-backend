@@ -3,6 +3,7 @@ import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal
 import { rateLimit } from '../middleware/rateLimit.js'
 import { AUDIT_ACTION, AUDIT_DOMAIN, auditHttpRequest, auditHttpResponse, recordAuditEvent } from '../audit/index.js'
 import { findUserById } from '../repositories/users.repository.js'
+import { provisionClientSchema } from '../db/clientSchema/provision.js'
 import {
   exchangeImpersonationCode,
   createRoleCatalog,
@@ -178,6 +179,9 @@ authRouter.post('/users', authenticate, requireRoleMatchesPortal, requireRole('a
       return res.status(400).json({ error: 'password must be at least 8 characters' })
     }
     const user = await registerUser({ email, password, displayName, role: String(role) }, req.auth.role)
+    if (user.role === 'client') {
+      provisionClientSchema(user.id).catch((err) => console.error('[client-schema] provision failed', user.id, err.message))
+    }
     recordAuditEvent({
       domain: AUDIT_DOMAIN.USER,
       action: AUDIT_ACTION.USER_CREATED,
