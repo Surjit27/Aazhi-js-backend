@@ -10,8 +10,8 @@ export const AUDIT_ACTION = {
   LOGOUT: 'logout',
   USER_CREATED: 'user.created',
   ROLE_CREATED: 'role.created',
-  IMPERSONATION_STARTED: 'impersonation.started',
-  IMPERSONATION_OPENED: 'impersonation.opened',
+  /** One row when the client tab successfully opens an impersonation session. */
+  IMPERSONATION: 'impersonation',
   EMAIL_SETTINGS_UPDATED: 'settings.updated',
   EMAIL_TEST_SENT: 'test.sent',
   EMAIL_TEST_FAILED: 'test.failed',

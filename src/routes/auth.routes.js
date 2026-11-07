@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 import { rateLimit } from '../middleware/rateLimit.js'
-import { AUDIT_ACTION, AUDIT_DOMAIN, recordAuditEvent } from '../audit/index.js'
+import { AUDIT_ACTION, AUDIT_DOMAIN, auditHttpRequest, auditHttpResponse, recordAuditEvent } from '../audit/index.js'
+import { findUserById } from '../repositories/users.repository.js'
 import {
   exchangeImpersonationCode,
   createRoleCatalog,
@@ -36,7 +37,11 @@ authRouter.post('/login', loginLimiter, async (req, res, next) => {
       actorUserId: result.user.id,
       subjectId: result.user.id,
       subjectLabel: result.user.email,
-      metadata: { portal: surface },
+      metadata: {
+        performedByLabel: result.user.email,
+        request: auditHttpRequest('POST', '/api/auth/login', { email: result.user.email, portal: surface }),
+        response: auditHttpResponse({ user: result.user }),
+      },
     })
     res.json(result)
   } catch (err) {
@@ -83,13 +88,6 @@ authRouter.post(
       const userId = req.body?.userId
       if (!userId) return res.status(400).json({ error: 'userId is required' })
       const result = await startClientImpersonation(req.auth.userId, userId)
-      recordAuditEvent({
-        domain: AUDIT_DOMAIN.USER,
-        action: AUDIT_ACTION.IMPERSONATION_STARTED,
-        actorUserId: req.auth.userId,
-        subjectId: userId,
-        metadata: { expiresInSeconds: result.expiresInSeconds },
-      })
       res.json(result)
     } catch (err) {
       next(err)
@@ -104,12 +102,27 @@ authRouter.post('/impersonate/exchange', exchangeLimiter, async (req, res, next)
       return res.status(400).json({ error: 'code is required' })
     }
     const result = await exchangeImpersonationCode(code)
+    const admin = result.user.impersonatedBy ? await findUserById(result.user.impersonatedBy) : null
+    const responseForAudit = {
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        role: result.user.role,
+        impersonation: true,
+        impersonatedBy: result.user.impersonatedBy,
+      },
+    }
     recordAuditEvent({
       domain: AUDIT_DOMAIN.USER,
-      action: AUDIT_ACTION.IMPERSONATION_OPENED,
+      action: AUDIT_ACTION.IMPERSONATION,
       actorUserId: result.user.impersonatedBy,
       subjectId: result.user.id,
       subjectLabel: result.user.email,
+      metadata: {
+        performedByLabel: admin?.email ?? '',
+        request: auditHttpRequest('POST', '/api/auth/impersonate/exchange', { code }),
+        response: auditHttpResponse(responseForAudit),
+      },
     })
     res.json(result)
   } catch (err) {
