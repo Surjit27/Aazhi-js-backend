@@ -1,5 +1,6 @@
 import { Queue, QueueEvents, Worker } from 'bullmq'
 import IORedis from 'ioredis'
+import { AUDIT_ACTION, AUDIT_DOMAIN, recordAuditEvent } from '../audit/index.js'
 import {
   findJobTrigger,
   listEnabledDependents,
@@ -64,17 +65,40 @@ export async function syncTimeTrigger(row) {
 
 async function processJob(job) {
   const row = await findJobTrigger(job.data.triggerId)
-  if (!row?.enabled) return { skipped: true }
+  const reason = job.data?.reason ?? 'unknown'
+  if (!row?.enabled) {
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.JOB,
+      action: AUDIT_ACTION.JOB_RUN_SKIPPED,
+      subjectId: job.data?.triggerId,
+      metadata: { reason, note: 'disabled or missing trigger' },
+    })
+    return { skipped: true }
+  }
   try {
     await markJobTriggerRun(row.id, 'success')
     const dependents = await listEnabledDependents(row.id)
     for (const dependent of dependents) {
       await queue.add('run', { triggerId: dependent.id, reason: 'dependency' }, { removeOnComplete: 100 })
     }
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.JOB,
+      action: AUDIT_ACTION.JOB_RUN_SUCCESS,
+      subjectId: row.id,
+      subjectLabel: row.name,
+      metadata: { reason, target: row.target },
+    })
     console.log(`[jobs] ran ${row.name} → ${row.target}`)
     return { id: row.id, target: row.target }
   } catch (err) {
     await markJobTriggerRun(row.id, 'failed')
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.JOB,
+      action: AUDIT_ACTION.JOB_RUN_FAILED,
+      subjectId: row.id,
+      subjectLabel: row.name,
+      metadata: { reason, error: err.message },
+    })
     throw err
   }
 }
