@@ -72,3 +72,19 @@ model JobTrigger {
 
   @@map("job_triggers")
 }
+
+/// Append-only activity log (PaperTrail-style; see src/audit/).
+model AuditEvent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  domain       String   @db.VarChar(20)
+  action       String   @db.VarChar(80)
+  actorUserId  String?  @map("actor_user_id") @db.Uuid
+  subjectId    String?  @map("subject_id") @db.VarChar(120)
+  subjectLabel String   @default("") @map("subject_label") @db.VarChar(255)
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([domain, createdAt(sort: Desc)], map: "idx_audit_events_domain_created")
+  @@index([createdAt(sort: Desc)], map: "idx_audit_events_created")
+  @@map("audit_events")
+}
