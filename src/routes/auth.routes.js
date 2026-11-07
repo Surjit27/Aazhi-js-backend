@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 import { rateLimit } from '../middleware/rateLimit.js'
+import { AUDIT_ACTION, AUDIT_DOMAIN, recordAuditEvent } from '../audit/index.js'
 import {
   exchangeImpersonationCode,
   createRoleCatalog,
@@ -29,13 +30,34 @@ authRouter.post('/login', loginLimiter, async (req, res, next) => {
         ? 'admin'
         : 'client'
     const result = await login(email, password, surface)
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.LOGIN_SUCCESS,
+      actorUserId: result.user.id,
+      subjectId: result.user.id,
+      subjectLabel: result.user.email,
+      metadata: { portal: surface },
+    })
     res.json(result)
   } catch (err) {
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.LOGIN_FAILED,
+      subjectLabel: String(req.body?.email ?? '').trim().toLowerCase(),
+      metadata: { portal: String(req.headers['x-app-surface'] ?? 'client').toLowerCase() },
+    })
     next(err)
   }
 })
 
 authRouter.post('/logout', authenticate, (req, res) => {
+  recordAuditEvent({
+    domain: AUDIT_DOMAIN.USER,
+    action: AUDIT_ACTION.LOGOUT,
+    actorUserId: req.auth.userId,
+    subjectId: req.auth.userId,
+    subjectLabel: req.auth.email ?? '',
+  })
   revokeAccessToken(req.auth)
   res.json({ ok: true })
 })
@@ -61,6 +83,13 @@ authRouter.post(
       const userId = req.body?.userId
       if (!userId) return res.status(400).json({ error: 'userId is required' })
       const result = await startClientImpersonation(req.auth.userId, userId)
+      recordAuditEvent({
+        domain: AUDIT_DOMAIN.USER,
+        action: AUDIT_ACTION.IMPERSONATION_STARTED,
+        actorUserId: req.auth.userId,
+        subjectId: userId,
+        metadata: { expiresInSeconds: result.expiresInSeconds },
+      })
       res.json(result)
     } catch (err) {
       next(err)
@@ -75,6 +104,13 @@ authRouter.post('/impersonate/exchange', exchangeLimiter, async (req, res, next)
       return res.status(400).json({ error: 'code is required' })
     }
     const result = await exchangeImpersonationCode(code)
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.IMPERSONATION_OPENED,
+      actorUserId: result.user.impersonatedBy,
+      subjectId: result.user.id,
+      subjectLabel: result.user.email,
+    })
     res.json(result)
   } catch (err) {
     next(err)
@@ -94,6 +130,14 @@ authRouter.post('/roles', authenticate, requireRoleMatchesPortal, requireRole('a
   try {
     const { key, label, portal } = req.body ?? {}
     const role = await createRoleCatalog({ key, label, portal }, req.auth.role)
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.ROLE_CREATED,
+      actorUserId: req.auth.userId,
+      subjectId: role.id,
+      subjectLabel: role.key,
+      metadata: { portal: role.portal, label: role.label },
+    })
     res.status(201).json({ role })
   } catch (err) {
     next(err)
@@ -121,6 +165,14 @@ authRouter.post('/users', authenticate, requireRoleMatchesPortal, requireRole('a
       return res.status(400).json({ error: 'password must be at least 8 characters' })
     }
     const user = await registerUser({ email, password, displayName, role: String(role) }, req.auth.role)
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.USER_CREATED,
+      actorUserId: req.auth.userId,
+      subjectId: user.id,
+      subjectLabel: user.email,
+      metadata: { role: user.role },
+    })
     res.status(201).json({ user })
   } catch (err) {
     next(err)
