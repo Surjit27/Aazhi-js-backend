@@ -4,6 +4,7 @@ import { authRouter } from './auth.routes.js'
 import { emailSettingsRouter } from './emailSettings.routes.js'
 import { jobTriggersRouter } from './jobTriggers.routes.js'
 import { adminHistoryRouter } from './history.routes.js'
+import { adminFeatureFlagsRouter, clientFeatureFlagsRouter } from './featureFlags.routes.js'
 import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 
 export const apiRouter = Router()
@@ -13,6 +14,8 @@ apiRouter.use('/auth', authRouter)
 apiRouter.use('/settings', emailSettingsRouter)
 apiRouter.use('/settings', jobTriggersRouter)
 apiRouter.use('/admin', adminHistoryRouter)
+apiRouter.use('/admin', adminFeatureFlagsRouter)
+apiRouter.use('/client', clientFeatureFlagsRouter)
 
 apiRouter.get(
   '/orders',
